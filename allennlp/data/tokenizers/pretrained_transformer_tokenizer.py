@@ -1,4 +1,5 @@
 import copy
+import dataclasses
 import logging
 from typing import Any, Dict, List, Optional, Tuple, Iterable
 
@@ -232,12 +233,16 @@ class PretrainedTransformerTokenizer(Tokenizer):
         """
         This method only handles a single sentence (or sequence) of text.
         """
+        return self.batch_tokenize([text])[0]
+
+    @overrides
+    def batch_tokenize(self, texts: List[str]) -> List[List[Token]]:
         max_length = self._max_length
         if max_length is not None and not self._add_special_tokens:
             max_length += self.num_special_tokens_for_sequence()
 
-        encoded_tokens = self.tokenizer.encode_plus(
-            text=text,
+        batch_encoded_tokens = self.tokenizer.batch_encode_plus(
+            texts,
             add_special_tokens=True,
             max_length=max_length,
             stride=self._stride,
@@ -247,46 +252,50 @@ class PretrainedTransformerTokenizer(Tokenizer):
             return_token_type_ids=True,
             return_special_tokens_mask=True,
         )
+
+        batch_tokens: List[List[Token]] = []
         # token_ids contains a final list with ids for both regular and special tokens
-        token_ids, token_type_ids, special_tokens_mask, token_offsets = (
-            encoded_tokens["input_ids"],
-            encoded_tokens["token_type_ids"],
-            encoded_tokens["special_tokens_mask"],
-            encoded_tokens.get("offset_mapping"),
-        )
-
-        # If we don't have token offsets, try to calculate them ourselves.
-        if token_offsets is None:
-            token_offsets = self._estimate_character_indices(text, token_ids)
-
-        tokens = []
-        for token_id, token_type_id, special_token_mask, offsets in zip(
-            token_ids, token_type_ids, special_tokens_mask, token_offsets
+        for token_ids, token_type_ids, special_tokens_mask, token_offsets in zip(
+            batch_encoded_tokens["input_ids"],
+            batch_encoded_tokens["token_type_ids"],
+            batch_encoded_tokens["special_tokens_mask"],
+            batch_encoded_tokens.get("offset_mapping", []),
         ):
-            # In `special_tokens_mask`, 1s indicate special tokens and 0s indicate regular tokens.
-            # NOTE: in transformers v3.4.0 (and probably older versions) the docstring
-            # for `encode_plus` was incorrect as it had the 0s and 1s reversed.
-            # https://github.com/huggingface/transformers/pull/7949 fixed this.
-            if not self._add_special_tokens and special_token_mask == 1:
-                continue
 
-            if offsets is None or offsets[0] >= offsets[1]:
-                start = None
-                end = None
-            else:
-                start, end = offsets
+            # If we don't have token offsets, try to calculate them ourselves.
+            if token_offsets is None:
+                token_offsets = self._estimate_character_indices(text, token_ids)
 
-            tokens.append(
-                Token(
-                    text=self.tokenizer.convert_ids_to_tokens(token_id, skip_special_tokens=False),
-                    text_id=token_id,
-                    type_id=token_type_id,
-                    idx=start,
-                    idx_end=end,
+            tokens = []
+            for token_id, token_type_id, special_token_mask, offsets in zip(
+                token_ids, token_type_ids, special_tokens_mask, token_offsets
+            ):
+                # In `special_tokens_mask`, 1s indicate special tokens and 0s indicate regular tokens.
+                # NOTE: in transformers v3.4.0 (and probably older versions) the docstring
+                # for `encode_plus` was incorrect as it had the 0s and 1s reversed.
+                # https://github.com/huggingface/transformers/pull/7949 fixed this.
+                if not self._add_special_tokens and special_token_mask == 1:
+                    continue
+
+                if offsets is None or offsets[0] >= offsets[1]:
+                    start = None
+                    end = None
+                else:
+                    start, end = offsets
+
+                tokens.append(
+                    Token(
+                        text=self.tokenizer.convert_ids_to_tokens(token_id, skip_special_tokens=False),
+                        text_id=token_id,
+                        type_id=token_type_id,
+                        idx=start,
+                        idx_end=end,
+                    )
                 )
-            )
 
-        return tokens
+            batch_tokens.append(tokens)
+
+        return batch_tokens
 
     def _estimate_character_indices(
         self, text: str, token_ids: List[int]
@@ -424,30 +433,50 @@ class PretrainedTransformerTokenizer(Tokenizer):
 
         return tokens_a, offsets_a, offsets_b
 
+    def with_new_type_id(self, tokens: List[Token], type_id: int) -> List[Token]:
+        # return [dataclasses.replace(t, type_id=type_id) for t in tokens]
+        # return [
+        #     Token(
+        #         text=t.text,
+        #         idx=t.idx,
+        #         idx_end=t.idx_end,
+        #         lemma_=t.lemma_,
+        #         pos_=t.pos_,
+        #         tag_=t.tag_,
+        #         dep_=t.dep_,
+        #         ent_type_=t.ent_type_,
+        #         text_id=t.text_id,
+
+        #         type_id=type_id,
+        #     )
+        #     for t in tokens
+        # ]
+        for token in tokens:
+            token.type_id = type_id
+        return tokens
+
     def add_special_tokens(
         self, tokens1: List[Token], tokens2: Optional[List[Token]] = None
     ) -> List[Token]:
-        def with_new_type_id(tokens: List[Token], type_id: int) -> List[Token]:
-            return [dataclasses.replace(t, type_id=type_id) for t in tokens]
 
         # Make sure we don't change the input parameters
         tokens2 = copy.deepcopy(tokens2)
 
         # We add special tokens and also set token type ids.
-        import dataclasses
+        # import dataclasses
 
         if tokens2 is None:
             return (
                 self.single_sequence_start_tokens
-                + with_new_type_id(tokens1, self.single_sequence_token_type_id)  # type: ignore
+                + self.with_new_type_id(tokens1, self.single_sequence_token_type_id)  # type: ignore
                 + self.single_sequence_end_tokens
             )
         else:
             return (
                 self.sequence_pair_start_tokens
-                + with_new_type_id(tokens1, self.sequence_pair_first_token_type_id)  # type: ignore
+                + self.with_new_type_id(tokens1, self.sequence_pair_first_token_type_id)  # type: ignore
                 + self.sequence_pair_mid_tokens
-                + with_new_type_id(tokens2, self.sequence_pair_second_token_type_id)  # type: ignore
+                + self.with_new_type_id(tokens2, self.sequence_pair_second_token_type_id)  # type: ignore
                 + self.sequence_pair_end_tokens
             )
 
