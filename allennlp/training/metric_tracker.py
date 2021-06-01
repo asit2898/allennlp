@@ -47,6 +47,8 @@ class MetricTracker:
                 self.tracked_metrics.append((1.0, name[1:]))
             elif name.startswith("-"):
                 self.tracked_metrics.append((-1.0, name[1:]))
+            elif name.startswith("~"):
+                self.tracked_metrics.append((0, name[1:]))
             else:
                 raise ConfigurationError("metric_name must start with + or -")
 
@@ -100,7 +102,10 @@ class MetricTracker:
                 "metric for early stopping, but the model did not produce that metric."
             )
 
-        new_best = (self._best_so_far is None) or (combined_score > self._best_so_far)
+        if sum(factor for factor, _ in self.tracked_metrics) == 0:
+            new_best = True
+        else:
+            new_best = (self._best_so_far is None) or (combined_score > self._best_so_far)
 
         if new_best:
             self.best_epoch = self._epoch_number

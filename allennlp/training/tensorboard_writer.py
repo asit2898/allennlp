@@ -279,10 +279,14 @@ class TensorboardWriter(FromParams):
         for name in sorted(metric_names):
             # Log to tensorboard
             train_metric = train_metrics.get(name)
+            if not isinstance(train_metric, (int, float)):
+                train_metric = None
             if train_metric is not None:
                 self.add_train_scalar(name, train_metric, timestep=epoch)
             val_metric = val_metrics.get(name)
-            if val_metric is not None:
+            if not isinstance(val_metric, (int, float)):
+                val_metric = None
+            if val_metric is not None and isinstance(val_metric, (int, float)):
                 self.add_validation_scalar(name, val_metric, timestep=epoch)
 
             # And maybe log to console

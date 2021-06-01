@@ -45,6 +45,7 @@ class MetadataField(Field[DataArray], Mapping[str, Any]):
         try:
             return len(self.metadata)
         except TypeError:
+            return 0
             raise TypeError("your metadata has no length")
 
     @overrides

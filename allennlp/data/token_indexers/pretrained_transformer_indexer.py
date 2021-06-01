@@ -73,6 +73,9 @@ class PretrainedTransformerIndexer(TokenIndexer):
                     "max_length needs to be greater than the number of special tokens inserted."
                 )
 
+
+        self._max_positions = self._tokenizer.model_max_length
+
     def _add_encoding_to_vocabulary_if_needed(self, vocab: Vocabulary) -> None:
         """
         Copies tokens from ```transformers``` model's vocab to the specified namespace.

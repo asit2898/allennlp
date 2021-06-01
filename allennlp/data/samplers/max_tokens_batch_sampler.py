@@ -55,9 +55,13 @@ class MaxTokensBatchSampler(BucketBatchSampler):
         max_tokens: int,
         sorting_keys: List[str] = None,
         padding_noise: float = 0.1,
+        square_complexity: bool = False,
+        max_batch_size: int = None
     ):
         super().__init__(-1, sorting_keys, padding_noise, False)
         self.max_tokens = max_tokens
+        self.square_complexity = square_complexity
+        self.max_batch_size = max_batch_size
 
     def _lazy_groups_of_max_size(
         self,
@@ -76,21 +80,26 @@ class MaxTokensBatchSampler(BucketBatchSampler):
         size_iter = iter(sizes)
 
         for item, size in zip(iterator, size_iter):
+            if self.square_complexity:
+                size **= 2
+
             if size > self.max_tokens:
                 logger.warning(
                     "Found instance of size %d, which is bigger than the expected size for a batch (%d)",
                     size,
                     self.max_tokens,
                 )
-            group_size = max(size, cur_max_size) * (len(group) + 1)
+            group_sample_size = max(size, cur_max_size)
+            group_samples = len(group) + 1
+            group_size = group_sample_size * group_samples
 
-            if group_size > self.max_tokens:
+            if group_size > self.max_tokens or len(group) == self.max_batch_size:
                 yield group
                 cur_max_size = 0
                 group = []
 
             group.append(item)
-            cur_max_size = max(cur_max_size, size)
+            cur_max_size = group_sample_size
 
         if len(group) != 0:
             yield group

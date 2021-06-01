@@ -945,7 +945,13 @@ class GradientDescentTrainer(Trainer):
                     )
 
                     # Check validation metric for early stopping
-                    self._metric_tracker.add_metrics(val_metrics)
+
+                    trackable_metrics = {
+                        f'training_{key}': value for key, value in train_metrics.items()
+                    }
+                    trackable_metrics.update(val_metrics)
+
+                    self._metric_tracker.add_metrics(trackable_metrics)
 
                     if self._metric_tracker.should_stop_early():
                         logger.info("Ran out of patience.  Stopping training.")

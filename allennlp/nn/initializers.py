@@ -23,6 +23,7 @@ The available initialization functions are
 * ["pretrained"](./initializers.md#PretrainedModelInitializer)
 """
 import logging
+import os
 import re
 import math
 from typing import Callable, List, Tuple, Dict
@@ -391,7 +392,10 @@ class PretrainedModelInitializer(Initializer):
         )  # import here to avoid circular imports
 
         self.weights: Dict[str, torch.Tensor]
-        if tarfile.is_tarfile(weights_file_path):
+        if os.path.isdir(weights_file_path):
+            weights_file_path = get_weights_path(weights_file_path)
+            self.weights = torch.load(weights_file_path, map_location="cpu")
+        elif tarfile.is_tarfile(weights_file_path):
             with extracted_archive(weights_file_path) as extraction_path:
                 self.weights = torch.load(get_weights_path(extraction_path), map_location="cpu")
         else:

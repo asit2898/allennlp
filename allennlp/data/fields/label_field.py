@@ -1,4 +1,4 @@
-from typing import Dict, Union, Set
+from typing import Dict, Optional, Union, Set
 import logging
 
 from overrides import overrides
@@ -46,21 +46,30 @@ class LabelField(Field[torch.Tensor]):
     _already_warned_namespaces: Set[str] = set()
 
     def __init__(
-        self, label: Union[str, int], label_namespace: str = "labels", skip_indexing: bool = False
+        self, label: Union[str, int],
+        label_id: int = None,
+        label_namespace: str = "labels",
+        skip_indexing: bool = False,
+        num_classes: Optional[int] = None
     ) -> None:
         self.label = label
         self._label_namespace = label_namespace
-        self._label_id = None
+        self._label_id = label_id
         self._maybe_warn_for_namespace(label_namespace)
         self._skip_indexing = skip_indexing
 
+        # self._num_classes = num_classes
+
         if skip_indexing:
-            if not isinstance(label, int):
-                raise ConfigurationError(
-                    "In order to skip indexing, your labels must be integers. "
-                    "Found label = {}".format(label)
-                )
-            self._label_id = label
+            if label_id is not None:
+                self._label_id = label_id
+            else:
+                if not isinstance(label, int):
+                    raise ConfigurationError(
+                        "In order to skip indexing, your labels must be integers. "
+                        "Found label = {}".format(label)
+                    )
+                self._label_id = label
         elif not isinstance(label, str):
             raise ConfigurationError(
                 "LabelFields must be passed a string label if skip_indexing=False. "
@@ -83,13 +92,20 @@ class LabelField(Field[torch.Tensor]):
     def count_vocab_items(self, counter: Dict[str, Dict[str, int]]):
         if self._label_id is None:
             counter[self._label_namespace][self.label] += 1  # type: ignore
+        elif isinstance(self.label, str):
+            counter[self._label_namespace][self.label] = 10000000 - self._label_id
 
     @overrides
     def index(self, vocab: Vocabulary):
-        if not self._skip_indexing:
-            self._label_id = vocab.get_token_index(
+        if not self._skip_indexing or isinstance(self.label, str):
+            label_id = vocab.get_token_index(
                 self.label, self._label_namespace  # type: ignore
             )
+            if self._label_id is None:
+                self._label_id = label_id
+            else:
+                assert self._label_id == label_id
+
 
     @overrides
     def get_padding_lengths(self) -> Dict[str, int]:

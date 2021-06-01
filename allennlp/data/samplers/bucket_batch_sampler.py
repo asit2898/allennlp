@@ -89,14 +89,20 @@ class BucketBatchSampler(BatchSampler):
             lengths = []
             noisy_lengths = []
             for field_name in self.sorting_keys:  # type: ignore
-                if field_name not in instance.fields:
+                field = instance.fields.get(field_name)
+                if field is None:
                     raise ConfigurationError(
                         f'Sorting key "{field_name}" is not a field in instance. '
                         f"Available fields/keys are {list(instance.fields.keys())}."
                     )
-                lengths.append(len(instance.fields[field_name]))
-
-                noisy_lengths.append(add_noise_to_value(lengths[-1], self.padding_noise))
+                length = len(field)
+                # If the field provides custom padding lengths
+                # we better use them
+                padding_lengths = field.get_padding_lengths()
+                if padding_lengths:
+                    length = max(length for length in padding_lengths.values())
+                lengths.append(length)
+                noisy_lengths.append(add_noise_to_value(length, self.padding_noise))
             instances_with_lengths.append((noisy_lengths, lengths, instance))
         with_indices = [(x, i) for i, x in enumerate(instances_with_lengths)]
         with_indices.sort(key=lambda x: x[0][0])

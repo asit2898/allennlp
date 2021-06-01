@@ -1,4 +1,6 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
+
+import math
 
 import torch
 
@@ -39,8 +41,17 @@ class TokenIndexer(Registrable):
     default_implementation = "single_id"
     has_warned_for_as_padded_tensor = False
 
-    def __init__(self, token_min_padding_length: int = 0) -> None:
+    def __init__(
+        self,
+        token_min_padding_length: int = 0,
+        pad_to_multiple_of: int = 1,
+        max_positions: Optional[int] = None,
+    ) -> None:
         self._token_min_padding_length: int = token_min_padding_length
+        self._pad_to_multiple_of = pad_to_multiple_of
+        self._max_positions = max_positions
+        # # TODO what about max_tokens samplers?
+        # # TODO look how it's implemented in fairseq
 
     def count_vocab_items(self, token: Token, counter: Dict[str, Dict[str, int]]):
         """
@@ -90,7 +101,13 @@ class TokenIndexer(Registrable):
         """
         padding_lengths = {}
         for key, token_list in indexed_tokens.items():
-            padding_lengths[key] = max(len(token_list), self._token_min_padding_length)
+            num_tokens = len(token_list)
+            num_tokens = max(num_tokens, self._token_min_padding_length)
+            # Here we round up to the closest multiple above
+            num_tokens = math.ceil(num_tokens / self._pad_to_multiple_of) * self._pad_to_multiple_of
+            if self._max_positions is not None:
+                num_tokens = min(num_tokens, self._max_positions)
+            padding_lengths[key] = num_tokens
         return padding_lengths
 
     def as_padded_tensor_dict(
