@@ -708,8 +708,7 @@ class TrainModel(Registrable):
         )
 
         vocabulary_ = vocabulary.construct(instances=instance_generator)
-
-        model_ = model.construct(vocab=vocabulary_, serialization_dir=serialization_dir)
+        # TODO we need to move this after the indexing
 
         # Initializing the model can have side effect of expanding the vocabulary.
         # Save the vocab only in the primary. In the degenerate non-distributed
@@ -721,7 +720,9 @@ class TrainModel(Registrable):
             vocabulary_.save_to_files(vocabulary_path)
 
         for data_loader_ in data_loaders.values():
-            data_loader_.index_with(model_.vocab)
+            data_loader_.index_with(vocabulary_)
+
+        model_ = model.construct(vocab=vocabulary_, serialization_dir=serialization_dir)
 
         # We don't need to pass serialization_dir and local_rank here, because they will have been
         # passed through the trainer by from_params already, because they were keyword arguments to
