@@ -21,6 +21,8 @@ from allennlp.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
 from allennlp.data.tokenizers import Tokenizer, PretrainedTransformerTokenizer
 from allennlp.data.dataset_readers.dataset_reader import DatasetReader
 from allennlp.data.tokenizers.token_class import Token
+from allennlp.data.dataset_readers.huggingface import HuggingFaceDatasetReader
+
 
 from datasets import load_dataset
 from datasets.features import Features, Value, ClassLabel, Sequence
@@ -194,3 +196,4 @@ class NLUDatasetReader(HuggingFaceDatasetReader):
         #     fields[key] = MetadataField(value)
 
         # return Instance(fields)
+

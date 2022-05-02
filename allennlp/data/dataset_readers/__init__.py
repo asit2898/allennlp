@@ -21,3 +21,4 @@ from allennlp.data.dataset_readers.sharded_dataset_reader import ShardedDatasetR
 from allennlp.data.dataset_readers.text_classification_json import TextClassificationJsonReader
 
 from allennlp.data.dataset_readers.huggingface import HuggingFaceDatasetReader
+from allennlp.data.dataset_readers.nlu_reader import NLUDatasetReader
