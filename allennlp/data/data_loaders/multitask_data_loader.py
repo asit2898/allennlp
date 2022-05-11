@@ -117,6 +117,7 @@ class MultiTaskDataLoader(DataLoader):
         cuda_device: Optional[Union[int, str, torch.device]] = None,
     ) -> None:
         self.readers = reader.readers
+        print("readers", self.readers, type(self.readers))
         self.data_paths = data_path
         self.scheduler = scheduler
         self.sampler = sampler
@@ -248,7 +249,7 @@ class MultiTaskDataLoader(DataLoader):
     def _make_data_loader(self, key: str) -> MultiProcessDataLoader:
         kwargs: Dict[str, Any] = {
             "reader": _MultitaskDatasetReaderShim(self.readers[key], key),
-            "data_path": self.data_paths[key],
+             "data_path": self.data_paths[key],
             # We don't load batches from this data loader, only instances, but we have to set
             # something for the batch size, so we set 1.
             "batch_size": 1,

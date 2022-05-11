@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 set_caching_enabled(os.environ.get('HF_DISABLE_CACHE', '').strip() != "1")
 
+label2id_map = { 'mnli': {'entailment': 0, 'neutral': 1, 'contradiction': 2}, 'cb': {'entailment': 0, 'neutral': 1, 'contradiction': 2} }
 
 @dataclass
 class SentencePairFeature:
@@ -120,8 +121,11 @@ class HuggingFaceDatasetReader(DatasetReader):
                 name = self.name
 
         dataset: Dataset = self.get_huggingface_dataset(self.path, name, split=split)
+        if name in label2id_map:
+            dataset = dataset.align_labels_with_mapping(label2id_map[name], "label")
+         
         features: Features = dataset.features.copy()
-
+        
         yield from self._read_from_huggingface_dataset(dataset, features)
 
     def _read_from_huggingface_dataset(
